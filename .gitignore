@@ -1,0 +1,12 @@
+# build dir
+build
+
+*.project
+*.swp
+
+# qtcreator project file
+slog.files
+slog.config
+slog.creator
+slog.creator.user
+slog.includes
