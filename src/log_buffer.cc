@@ -13,8 +13,7 @@ namespace slog
     ref_entry_.line  = line;
     ref_entry_.level = level;
     ref_entry_.mask  = &mask;
-    ref_entry_.time  = std::chrono::high_resolution_clock::now();
-    current_entry_   = ref_entry_;
+    current_entry_   = make_entry_(); 
   }
 
   log_buffer::log_buffer(log_buffer&& b)
@@ -49,9 +48,16 @@ namespace slog
     return !traits_type::eof();
   }
 
+	entry log_buffer::make_entry_()
+	{
+		entry local_entry = ref_entry_;
+		local_entry.time  = std::chrono::high_resolution_clock::now();
+		return local_entry;
+	}
+
   void log_buffer::push_()
   {
-    entry local_entry = ref_entry_;
+    entry local_entry = make_entry_();
     std::swap(current_entry_, local_entry);
 
     static logger_manager &manager = logger_manager::instance();

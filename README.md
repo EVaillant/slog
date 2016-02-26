@@ -1,6 +1,5 @@
 # Simple Log 
 
-* depends on toolsbox
 * without rtti
 * without exception
 
@@ -11,6 +10,7 @@ TODO
 ## Required
 
 * c++ compiler with support c++11 and some part of c++14
+* [toolsbox](https://github.com/EVaillant/toolsbox)
 * [cmake](https://cmake.org/) 2.6 or highter
 * boost / unit test (not mandatory, to run unit test)
 
@@ -26,6 +26,7 @@ Common cmake option (to add on common line) :
 --------| ------|---------|------------
 CMAKE_BUILD_TYPE | Debug or Release | Debug | Select build type
 CMAKE_INSTALL_PREFIX | path | /usr/local | Prefix installation
+DISABLE_UNITTEST | ON or OFF | OFF | Disable unittest
 
 run cmake :
 

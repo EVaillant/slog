@@ -19,6 +19,7 @@ namespace slog
 
     protected:
       void push_();
+			entry make_entry_();
 
       // from std::streambuf
       virtual int overflow(int c);
