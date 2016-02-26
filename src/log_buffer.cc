@@ -1,82 +1,60 @@
 #include <slog/log_buffer.hpp>
+#include <slog/logger_manager.hpp>
 
-#include <slog/entry.hpp>
-#include <slog/ientry_writer.hpp>
-
+#include <utility>
 #include <chrono>
 
 namespace slog
 {
-  LogBuffer::LogBuffer(const std::string &file, int line, Level level, const std::string &prefix)
-    : file_(file)
-    , line_ (line)
-    , level_ (level)
-    , prefix_(prefix)
+  log_buffer::log_buffer(const char* file, int line, log_level level, bool enable, const mask_tag_type& mask)
+    : enable_(enable)
   {
+    ref_entry_.file  = file;
+    ref_entry_.line  = line;
+    ref_entry_.level = level;
+    ref_entry_.mask  = &mask;
+    ref_entry_.time  = std::chrono::high_resolution_clock::now();
+    current_entry_   = ref_entry_;
   }
 
-  LogBuffer::LogBuffer(LogBuffer &&l)
-    : file_(std::move(l.file_))
-    , line_(l.line_)
-    , level_(l.level_)
-    , prefix_(std::move(l.prefix_))
-    , entry_(std::move(l.entry_))
-    , writers_(std::move(l.writers_))
+  log_buffer::log_buffer(log_buffer&& b)
+    : enable_(b.enable_)
+    , ref_entry_(std::move(b.ref_entry_))
+    , current_entry_(std::move(b.current_entry_))
   {
   }
-
-  LogBuffer::~LogBuffer()
+  
+  log_buffer::~log_buffer()
   {
-    push_();
-  }
-
-  void LogBuffer::append(const std::shared_ptr<IEntryWriter> &writer)
-  {
-    writers_.insert(writer);
-  }
-
-  void LogBuffer::create_entry_()
-  {
-    entry_ = std::make_shared<Entry>();
-    entry_->file  = file_;
-    entry_->line  = line_;
-    entry_->level = level_;
-    entry_->msg   = prefix_ + " ";
-    entry_->time  = std::chrono::high_resolution_clock::now();
-  }
-
-  int LogBuffer::overflow(int c)
-  {
-    if(!writers_.empty())
+    if(enable_ && !current_entry_.msg.empty())
     {
-      if(!entry_)
-      {
-        create_entry_();
-      }
+      push_();
+    }
+  }
 
+  int log_buffer::overflow(int c)
+  {
+    if(enable_)
+    {
       if(c == '\n')
       {
         push_();
       }
       else
       {
-        entry_->msg += (char) c;
+        current_entry_.msg += (char) c;
       }
     }
 
     return !traits_type::eof();
   }
 
-  void LogBuffer::push_()
+  void log_buffer::push_()
   {
-    if(entry_)
-    {
-      for(auto &writer : writers_)
-      {
-        writer->write(entry_);
-      }
+    entry local_entry = ref_entry_;
+    std::swap(current_entry_, local_entry);
 
-      entry_.reset();
-    }
+    static logger_manager &manager = logger_manager::instance();
+    manager.notif_log(std::move(local_entry));
   }
 }

@@ -2,66 +2,30 @@
 # define SLOG_DETAIL_FOR_EACH_TAG_HPP
 
 # include <utility>
-# include <type_traits>
+# include <tuple>
 
-# include <slog/tag.hpp>
+# include <slog/detail/expand_tag.hpp>
 
 namespace slog
 {
   namespace detail
   {
-    template <class F, class ... Tag> struct for_each_tag
+    template <class Tag> class for_each_tag
     {
-    };
+      public:
+        typedef typename expand_tag<Tag>::type expand_tag_type;
+        template <std::size_t I> using         tag_type = typename std::tuple_element<I, expand_tag_type>::type;
+        static const std::size_t               expand_tag_size = std::tuple_size<std::decay_t<expand_tag_type>>::value;
 
-    template <class F, class Tag> struct for_each_tag<F, Tag>
-    {
-        template <class ... Args> static auto exec(Args&& ... args) -> decltype(F::template exec<Tag>(std::forward<Args>(args)...))
+        template <class F, class ... Args> auto operator()(F && f, Args&& ... args)
         {
-          return F::template exec<Tag>(std::forward<Args>(args)...);
-        }
-    };
-
-    template <class F> struct for_each_tag<F>
-    {
-        template <class ... Args> static auto exec(Args&& ... args) -> decltype(F::default_value(std::forward<Args>(args)...))
-        {
-          return F::default_value(std::forward<Args>(args)...);
-        }
-    };
-
-    template <class F, class ... Tag> struct for_each_tag<F, slog::tag_alias<Tag...> >
-    {
-        template <class ... Args> static auto exec(Args && ... args) -> decltype(for_each_tag<F, Tag...>::exec(std::forward<Args>(args)...))
-        {
-          return for_each_tag<F, Tag...>::exec(std::forward<Args>(args)...);
-        }
-    };
-
-    template <class F, class T0, class ... Tag> struct for_each_tag<F, T0, Tag...>
-    {
-        template <class ... Args> static auto exec(Args && ... args) ->
-          typename std::enable_if<
-            !std::is_same<
-              decltype(for_each_tag<F, T0>::exec(std::forward<Args>(args)...)),
-              void
-            >::value,
-            decltype(for_each_tag<F, T0>::exec(std::forward<Args>(args)...))
-          >::type
-        {
-          return F::merge(for_each_tag<F, T0>::exec(std::forward<Args>(args)...), for_each_tag<F, Tag...>::exec(std::forward<Args>(args)...));
+          return invoke_(std::forward<F>(f), std::make_index_sequence<expand_tag_size>{}, std::forward<Args>(args)...);
         }
 
-        template <class ... Args> static auto exec(Args && ... args) ->
-          typename std::enable_if<
-            std::is_same<
-              decltype(for_each_tag<F, T0>::exec(std::forward<Args>(args)...)),
-              void
-            >::value
-          >::type
+      private:
+        template <class F, class ... Args, std::size_t ... I> auto invoke_(F && f, std::index_sequence<I...>, Args&& ... args)
         {
-          for_each_tag<F, T0>::exec(std::forward<Args>(args)...);
-          for_each_tag<F, Tag...>::exec(std::forward<Args>(args)...);
+          return f.template operator()<tag_type<I>...>(std::forward<Args>(args)...);
         }
     };
   }

@@ -2,112 +2,94 @@
 # error "must not be included directly"
 #endif
 
-#include <slog/detail/for_each_tag.hpp>
-#include <slog/log_stream.hpp>
+# include <slog/detail/for_each_tag.hpp>
+# include <functional>
 
 namespace slog
 {
   namespace detail
   {
-    struct fonctor_enable_impl
+    inline uint32_t& last_tag_id()
     {
-        template <class Tag> static bool exec()
-        {
-          return Tag::enable;
-        }
+      static uint32_t id = 0;
+      return id;
+    }
 
-        static bool default_value()
-        {
-          return true;
-        }
+    inline uint32_t make_tag_id()
+    {
+      static uint32_t &id = last_tag_id();
+      assert(id < nb_max_tag);
+      return id++;
+    }
 
-        template <class Tag> static void exec(bool val)
-        {
-          Tag::enable = val;
-        }
+    template <class T> uint32_t get_tag_id()
+    {
+      static uint32_t id = make_tag_id();
+      return id;
+    }
 
-        static bool merge(bool l, bool r)
+    struct is_enable_impl
+    {
+      template <class ... Tag> bool operator()()
+      {
+        bool ret = true;
+        static std::reference_wrapper<bool> values[] = {std::ref(Tag::enable)...};
+        for(bool& value : values)
         {
-          return l && r;
-        }
+          ret = ret && value;
+        }      
+        return ret;
+      }
     };
 
-    struct fonctor_prefix_impl
+    struct set_enable_impl
     {
-        template <class Tag> static const std::string& exec()
+      template <class ... Tag> void operator()(bool v)
+      {
+        static std::reference_wrapper<bool> values[] = {std::ref(Tag::enable)...};
+        for(bool& value : values)
         {
-          return Tag::prefix;
+          value = v;
         }
-
-        static const std::string& default_value()
-        {
-          static std::string value = "";
-          return value;
-        }
-
-        template <class Tag> static void exec(const std::string & val)
-        {
-          Tag::prefix = val;
-        }
-
-        static const std::string& merge(const std::string &l, const std::string& r)
-        {
-          return (l.empty() ? r : l);
-        }
+      }
     };
 
-    struct functor_append_writer
+    struct make_mask_impl
     {
-        template <class Tag> static void exec(Level level, const std::shared_ptr<IEntryWriter>& writer)
+      template <class ... Tag> mask_tag_type operator()()
+      {
+        static std::reference_wrapper<const uint32_t> ids[] = {std::cref(Tag::id)...};
+        mask_tag_type mask;
+        for(const uint32_t& id : ids)
         {
-          return Tag::writter.append( std::make_pair(level, writer));
+          mask.set(id);
         }
-
-        static void default_value(Level, const std::shared_ptr<IEntryWriter>&)
-        {
-        }
-    };
-
-    struct functor_clear_writer
-    {
-        template <class Tag> static void exec()
-        {
-          return Tag::writter.clear();
-        }
-
-        static void default_value()
-        {
-        }
+        return mask;
+      }
     };
   }
 
-  template <class ... Tag> bool is_enable()
+  template <class T>           bool tag<T>::enable = true;
+  template <class T> const uint32_t tag<T>::id     = detail::get_tag_id<T>();
+
+  template <class Tag> bool is_enable()
   {
-    return detail::for_each_tag<detail::fonctor_enable_impl, Tag...>::exec();
+    detail::is_enable_impl f;
+    detail::for_each_tag<Tag> for_each;
+    return for_each(f);
   }
 
-  template <class ... Tag> void set_enable(bool value)
+  template <class Tag> void set_enable(bool value)
   {
-    detail::for_each_tag<detail::fonctor_enable_impl, Tag...>::exec(value);
+    detail::set_enable_impl f;
+    detail::for_each_tag<Tag> for_each;
+    return for_each(f, value);
   }
 
-  template <class ... Tag> std::string get_prefix()
+  template <class Tag> mask_tag_type make_mask_tag()
   {
-    return detail::for_each_tag<detail::fonctor_prefix_impl, Tag...>::exec();
-  }
-
-  template <class ... Tag> void set_prefix(const std::string &value)
-  {
-    detail::for_each_tag<detail::fonctor_prefix_impl, Tag...>::exec(value);
-  }
-
-  template <class ... Tag> void append_writter(Level level, const std::shared_ptr<IEntryWriter>& writer)
-  {
-    detail::for_each_tag<detail::functor_append_writer, Tag...>::exec(level, writer);
-  }
-
-  template <class ... Tag> void clear_writter()
-  {
-    detail::for_each_tag<detail::functor_clear_writer, Tag...>::exec();
+    detail::make_mask_impl f;
+    detail::for_each_tag<Tag> for_each;
+    return for_each(f);
   }
 }

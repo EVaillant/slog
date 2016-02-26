@@ -1,5 +1,6 @@
 # Simple Log 
 
+* depends on toolsbox
 * without rtti
 * without exception
 

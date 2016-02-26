@@ -1,22 +1,18 @@
 #include <slog/log_stream.hpp>
+#include <utility>
 
 namespace slog
 {
-  LogStream::LogStream(const std::string &file, int line, Level level, const std::string &prefix)
+  log_stream::log_stream(const char* file, int line, log_level level, bool enable, const mask_tag_type& mask)
     : std::ostream(this)
-    , LogBuffer(file, line, level, prefix)
+    , log_buffer(file, line, level, enable, mask)
   {
   }
 
-  LogStream::LogStream(LogStream &&m)
+  log_stream::log_stream(log_stream&& m)
     : std::ostream(this)
-    , LogBuffer(std::move(m))
+    , log_buffer(std::move(m))
   {
-  }
-
-  void LogStream::append_writer(const std::shared_ptr<IEntryWriter> &writer)
-  {
-    this -> append(writer);
   }
 }
 

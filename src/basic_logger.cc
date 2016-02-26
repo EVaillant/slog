@@ -1,5 +1,4 @@
-#include <slog/basic_entry_writer.hpp>
-#include <slog/entry.hpp>
+#include <slog/basic_logger.hpp>
 
 #include <iomanip>
 #include <sstream>
@@ -10,39 +9,38 @@
 namespace slog
 {
   //
-  // BasicEntryWriterOStream
+  // basic_ostream_logger
   //
-
-  BasicEntryWriterOStream::BasicEntryWriterOStream(std::ostream &stream)
+  basic_ostream_logger::basic_ostream_logger(std::ostream &stream)
     : stream_(stream)
     , enable_locate_(false)
   {
   }
 
-  void BasicEntryWriterOStream::set_locate(bool value)
+  void basic_ostream_logger::set_locate(bool value)
   {
     enable_locate_ = value;
   }
 
-  void BasicEntryWriterOStream::write(const std::shared_ptr<Entry> &entry)
+  void basic_ostream_logger::write(const entry& e)
   {
     std::ostringstream buffer;
 
-    append_timestamp_(buffer, entry->time);
+    append_timestamp_(buffer, e.time);
     buffer << " | ";
-    append_level_(buffer, entry->level);
-    buffer << " | " << entry->msg;
-    append_locate_(buffer, entry->file, entry->line);
+    append_level_(buffer, e.level);
+    buffer << " | " << e.msg;
+    append_locate_(buffer, e.file, e.line);
 
     append_stream_(buffer.str());
   }
 
-  void BasicEntryWriterOStream::append_stream_(const std::string &buffer)
+  void basic_ostream_logger::append_stream_(const std::string &buffer)
   {
     stream_ << buffer << std::endl;
   }
 
-  void BasicEntryWriterOStream::append_timestamp_(std::ostream& stream, const std::chrono::high_resolution_clock::time_point &time)
+  void basic_ostream_logger::append_timestamp_(std::ostream& stream, const std::chrono::high_resolution_clock::time_point &time)
   {
     std::chrono::high_resolution_clock::duration duration_from_epoch = time.time_since_epoch();
     std::time_t date = std::chrono::duration_cast<std::chrono::seconds>(duration_from_epoch).count();
@@ -54,25 +52,24 @@ namespace slog
     stream << tmp << "." << std::setfill('0') << std::setw(3) << ms;
   }
 
-  void BasicEntryWriterOStream::append_level_(std::ostream &stream, Level level)
+  void basic_ostream_logger::append_level_(std::ostream &stream, log_level level)
   {
     stream << std::left << std::setw(9) << std::setfill(' ') << level;
   }
 
-  void BasicEntryWriterOStream::append_locate_(std::ostream &stream, const std::string &file, int line)
+  void basic_ostream_logger::append_locate_(std::ostream &stream, const char *file, int line)
   {
-    if(enable_locate_ && !file.empty() && line != -1)
+    if(enable_locate_ && (file != nullptr) && line != -1)
     {
       stream << " (file:" << file << " line:" << line << ")";
     }
   }
 
   //
-  // BasicEntryWriterFStream
+  // basic_fstream_logger
   //
-
-  BasicEntryWriterFStream::BasicEntryWriterFStream(const std::string &filename, const std::string &filename_ext)
-    : BasicEntryWriterOStream(stream_)
+  basic_fstream_logger::basic_fstream_logger(const std::string &filename, const std::string &filename_ext)
+    : basic_ostream_logger(stream_)
     , filename_ext_(filename_ext)
     , file_counter_(0)
     , nb_line_(0)
@@ -106,7 +103,7 @@ namespace slog
     filename_ = stream_filename.str();
   }
 
-  void BasicEntryWriterFStream::set_max_line_by_file(int nb)
+  void basic_fstream_logger::set_max_line_by_file(int nb)
   {
     if(! stream_.is_open())
     {
@@ -114,7 +111,7 @@ namespace slog
     }
   }
 
-  void BasicEntryWriterFStream::set_max_file_size(int size)
+  void basic_fstream_logger::set_max_file_size(int size)
   {
     if(! stream_.is_open())
     {
@@ -122,7 +119,7 @@ namespace slog
     }
   }
 
-  void BasicEntryWriterFStream::append_stream_(const std::string &buffer)
+  void basic_fstream_logger::append_stream_(const std::string &buffer)
   {
     int buffer_size = buffer.size();
     if(!stream_.is_open()
@@ -132,7 +129,7 @@ namespace slog
       create_new_file_();
     }
 
-    BasicEntryWriterOStream::append_stream_(buffer);
+    basic_ostream_logger::append_stream_(buffer);
 
     // update counter
     if(max_line_by_file_ != -1 || max_file_size_ != -1)
@@ -142,7 +139,7 @@ namespace slog
     }
   }
 
-  void BasicEntryWriterFStream::create_new_file_()
+  void basic_fstream_logger::create_new_file_()
   {
     std::stringstream stream;
     stream << filename_;
@@ -158,74 +155,5 @@ namespace slog
       stream_.close();
     }
     stream_.open(stream.str(), std::fstream::out | std::fstream::trunc);
-  }
-
-  //
-  // AsyncEntryWriter
-  //
-
-  AsyncEntryWriter::AsyncEntryWriter(std::unique_ptr<IEntryWriter> &&writer)
-    : writer_(std::move(writer))
-    , quit_(false)
-  {
-    thread_ = std::thread([this]
-    ()
-      {
-        this->async_write_();
-      }
-    );
-  }
-
-  AsyncEntryWriter::~AsyncEntryWriter()
-  {
-    std::unique_lock<std::mutex> lock(entries_mutex_);
-    quit_ = true;
-    entries_cond_.notify_all();
-
-    thread_.join();
-  }
-
-  void AsyncEntryWriter::write(const std::shared_ptr<Entry> &entry)
-  {
-    std::unique_lock<std::mutex> lock(entries_mutex_);
-    if(!quit_)
-    {
-      bool need_to_wake_up_job = entries_.empty();
-			entries_.push_back(entry);
-      if(need_to_wake_up_job)
-      {
-        entries_cond_.notify_all();
-      }
-    }
-  }
-
-  void AsyncEntryWriter::async_write_()
-  {
-    std::shared_ptr<Entry> entry;
-    while(!quit_ || entry)
-    {
-      entry = get_first_entry_();
-      if(entry)
-      {
-        writer_->write(entry);
-      }
-    }
-  }
-
-  std::shared_ptr<Entry> AsyncEntryWriter::get_first_entry_()
-  {
-    std::unique_lock<std::mutex> lock(entries_mutex_);
-    while (entries_.empty() && !quit_)
-    {
-      entries_cond_.wait(lock);
-    }
-
-    std::shared_ptr<Entry> ret;
-    if(!entries_.empty())
-    {
-      ret = entries_.front();
-      entries_.pop_front();
-    }
-    return std::move(ret);
   }
 }

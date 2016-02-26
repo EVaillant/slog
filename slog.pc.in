@@ -8,3 +8,4 @@ Version: @PROJECT_VERSION@
 URL: https://github.com/EVaillant/slog
 Cflags: -I${includedir}
 Libs: -L${libdir} -lslog
+Requires: toolsbox

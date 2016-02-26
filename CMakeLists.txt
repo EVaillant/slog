@@ -41,6 +41,15 @@ include_directories(
 )
 
 #
+# Toolsbox
+find_package(PkgConfig)
+pkg_check_modules(toolsbox REQUIRED toolsbox)
+
+include_directories(
+  ${toolsbox_INCLUDE_DIR}
+)
+
+#
 # doxygen
 find_package(Doxygen)
 if(DOXYGEN_FOUND)

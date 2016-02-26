@@ -1,43 +1,32 @@
-#ifndef SLOG_LOG_DEVICE_HPP
-# define SLOG_LOG_DEVICE_HPP
+#ifndef SLOG_LOG_BUFFER_HPP
+# define SLOG_LOG_BUFFER_HPP
 
 # include <streambuf>
 # include <sstream>
 # include <memory>
 # include <set>
 
-# include <slog/level.hpp>
+# include <slog/common.hpp>
 
 namespace slog
 {
-  struct Entry;
-  class IEntryWriter;
-
-  class LogBuffer : public std::streambuf
+  class log_buffer : public std::streambuf
   {
     public:
-      LogBuffer(const std::string& file, int line, Level level, const std::string &prefix);
-      LogBuffer(LogBuffer && l);
-
-      virtual ~LogBuffer();
-
-      void append(const std::shared_ptr<IEntryWriter> &writer);
+      log_buffer(log_buffer&& b);
+      log_buffer(const char* file, int line, log_level level, bool enable, const mask_tag_type& mask);
+      virtual ~log_buffer();
 
     protected:
-      void create_entry_();
       void push_();
 
       // from std::streambuf
       virtual int overflow(int c);
 
     private:
-      std::string file_;
-      int line_;
-      Level level_;
-      std::string prefix_;
-
-      std::shared_ptr<Entry> entry_;
-      std::set<std::shared_ptr<IEntryWriter>> writers_;
+      bool  enable_;
+      entry ref_entry_;
+      entry current_entry_;
   };
 }
 
