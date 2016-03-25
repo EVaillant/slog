@@ -48,12 +48,12 @@ namespace slog
     return !traits_type::eof();
   }
 
-	entry log_buffer::make_entry_()
-	{
-		entry local_entry = ref_entry_;
-		local_entry.time  = std::chrono::high_resolution_clock::now();
-		return local_entry;
-	}
+  entry log_buffer::make_entry_()
+  {
+    entry local_entry = ref_entry_;
+    local_entry.time  = std::chrono::high_resolution_clock::now();
+    return local_entry;
+  }
 
   void log_buffer::push_()
   {
