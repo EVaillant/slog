@@ -1,8 +1,7 @@
-cmake_minimum_required(VERSION 2.6)
+cmake_minimum_required(VERSION 3.0)
+project(slog VERSION 0.0.1) 
 
-project(slog)
 set(PROJECT_DESCRIPTION "C++ Simple Logger (c++11/14)")
-set(PROJECT_VERSION 0.0.1 CACHE STRING "Version number")
 
 set(CMAKE_CXX_FLAGS         "${CMAKE_CXX_FLAGS} -Wall -Wextra -ggdb -std=c++1y -march=native -pthread")
 set(CMAKE_CXX_FLAGS_DEBUG   "${CMAKE_CXX_FLAGS_DEBUG}   -O0")
@@ -19,6 +18,12 @@ endif()
 enable_testing()
 
 #
+#
+include_directories(
+    include
+)
+
+#
 # Boost
 include(FindBoost)
 find_package(
@@ -31,10 +36,6 @@ if (Boost_FOUND)
     ${Boost_INCLUDE_DIR}
   )
 endif (Boost_FOUND)
-
-include_directories(
-    include
-)
 
 #
 # Toolsbox
